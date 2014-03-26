@@ -1,0 +1,8 @@
+.qmake.cache
+Makefile
+.moc/
+.obj/
+libQGLViewer.*
+ui_*.h
+*.o
+.qglviewer.xml
