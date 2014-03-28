@@ -8,9 +8,9 @@ SOURCES += \
   src/main.cc
 
 HEADERS += \
-  lib/*.h \
-  lib/*.hpp \
-  src/*.hpp
+  src/GLWidget.hpp \
+  src/MainWindow.hpp \
+  src/ZBWidget.hpp
 
 FORMS += \
   src/MainWindow.ui
