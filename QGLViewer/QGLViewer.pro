@@ -4,6 +4,8 @@
 # Run "qmake; make; make install" to compile and install the library on Unix systems.
 # Optional arguments can tune install paths (as in "qmake PREFIX=$HOME"). See doc/download.html for details.
 
+QGLVIEWER_STATIC = yes
+
 TEMPLATE = lib
 TARGET = QGLViewer
 VERSION = 2.5.1

@@ -4,5 +4,9 @@ Makefile
 .obj/
 libQGLViewer.*
 ui_*.h
+moc_*.cpp
 *.o
 .qglviewer.xml
+build/
+*.swp
+*.pyc
