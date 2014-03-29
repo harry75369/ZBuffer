@@ -22,7 +22,7 @@ void GLWidget::init()
   ASSERT_MSG(GLEW_OK==glewInit(), "GLWidget: GLEW failed to initialize!");
   ASSERT_MSG(m_model, "GLWidget: model failed to load!");
 
-  //m_model->debug();
+  m_model->debug();
 
   m_numShapes = m_model->numShapes();
   if ( m_numShapes > MAX_SHAPES )
@@ -63,6 +63,8 @@ void GLWidget::init()
   glColor3fv(diffuseColor);
 
   //glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+  
+  glClearColor(0.5f, 0.5f, 0.5f, 1.0f);
 }
 
 void GLWidget::draw()
