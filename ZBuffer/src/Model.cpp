@@ -156,9 +156,10 @@ void Model::getTriangles(std::vector<Triangle> &triangles, const Matrix4 &transf
       // do the transformation
       for ( size_t k=0; k < 3; k++ )
       {
-        t.vertices[k] = Vector4(positions[3*indices[j+k]], positions[3*indices[j+k]+1], positions[3*indices[j+k]+2], 1.0);
-        t.vertices[k] = transform * t.vertices[k];
-        t.vertices[k] /= t.vertices[k].w();
+        Vector4 v(positions[3*indices[j+k]], positions[3*indices[j+k]+1], positions[3*indices[j+k]+2], 1.0);
+        v = transform * v;
+        v /= v.w();
+        t.vertices[k] = Vector3(v.x(), v.y(), v.z());
       }
 
       // do statistics about vertex info
@@ -190,26 +191,24 @@ void Model::getTriangles(std::vector<Triangle> &triangles, const Matrix4 &transf
       // transform the normals as well
       for ( size_t k=0; k < 3; k++ )
       {
-        t.normals[k] = Vector4(normals[3*indices[j+k]], normals[3*indices[j+k]+1], normals[3*indices[j+k]+2], 1.0);
-        t.normals[k] = normal_transform * t.normals[k];
-        Vector3 n(t.normals[k].x()/t.normals[k].w(),
-                  t.normals[k].y()/t.normals[k].w(),
-                  t.normals[k].z()/t.normals[k].w());
-        n.normalize();
-        t.normals[k] = Vector4(n.x(), n.y(), n.z(), 1.0);
+        Vector4 n(normals[3*indices[j+k]], normals[3*indices[j+k]+1], normals[3*indices[j+k]+2], 1.0);
+        n = normal_transform * n;
+        t.normals[k] = Vector3(n.x()/n.w(), n.y()/n.w(), n.z()/n.w());
+        t.normals[k].normalize();
       }
 
       // filter out this triangle if it's facing backward to viewer
-      if (1)
-      if ( t.normals[0].z() < 0 || t.normals[1].z() < 0 || t.normals[2].z() < 0 )
+      // TODO: find out better solution
+      if (0)
+      //if ( t.normals[0].z() < 0 || t.normals[1].z() < 0 || t.normals[2].z() < 0 )
+      //if ( t.normals[0].z() + t.normals[1].z() + t.normals[2].z() < 0 )
       {
         n_filtered++;
         continue;
       }
       if (0)
       {
-        Vector4 n4 = t.normals[0] + t.normals[1] + t.normals[2];
-        Vector3 n(n4.x()/n4.w(), n4.y()/n4.w(), n4.z()/n4.w());
+        Vector3 n = t.normals[0] + t.normals[1] + t.normals[2];
         n.normalize();
         INFO("normal = (%.2f, %.2f, %.2f)", n.x(), n.y(), n.z());
       }
@@ -222,4 +221,93 @@ void Model::getTriangles(std::vector<Triangle> &triangles, const Matrix4 &transf
   INFO("range of y (before clip): (%.2f, %.2f)", y[0], y[1]);
   INFO("range of z (before clip): (%.2f, %.2f)", z[0], z[1]);
   INFO("filtered: %.2f%% (%lu/%lu)", 100.0f*n_filtered/(n_filtered+n_remained), n_filtered, n_filtered+n_remained);
+}
+
+void Triangle::raster(std::vector<Pixel> &pixels, int w, int h) const
+{
+  int x[2] = {99999, -99999};
+  int y[2] = {99999, -99999};
+  int xd[3];
+  int yd[3];
+
+  // find discrete coordinates of each vertex in 2D plane
+  for ( size_t i=0; i < 3; i++ )
+  {
+    xd[i] = int((vertices[i].x() + 1.0f) / 2.0f * w);
+    yd[i] = int((vertices[i].y() + 1.0f) / 2.0f * h);
+  }
+  for ( size_t i=0; i < 3; i++ )
+  {
+    x[0] = std::min(x[0], xd[i]);
+    x[1] = std::max(x[1], xd[i]);
+    y[0] = std::min(y[0], yd[i]);
+    y[1] = std::max(y[1], yd[i]);
+  }
+
+  // construct maxtrix A
+  Matrix3 A(Matrix3::Ones());
+  for ( size_t i=0; i < 3; i++ )
+  {
+    A(0, i) = xd[i];
+    A(1, i) = yd[i];
+  }
+  A = A.inverse().eval();
+
+  // find each pixel
+  for ( int i=x[0]; i <= x[1]; i++ )
+    for ( int j=y[0]; j <= y[1]; j++ )
+    {
+      Vector3 b(i, j, 1.0);
+      Vector3 t = A * b;
+
+      if ( t.x() < 0 || t.y() < 0 || t.z() < 0 )
+        continue;
+
+      pixels.push_back(Pixel(i, j, t));
+    }
+}
+
+float Triangle::getDepth(const Pixel &p) const
+{
+  const Vector3 &t = p.t;
+
+  return t.x()*vertices[0].z()
+       + t.y()*vertices[1].z()
+       + t.z()*vertices[2].z();
+}
+
+uint32_t Triangle::getColor(const Pixel &p) const
+{
+  int t = 255 * (0.5*getDepth(p)+0.5);
+  return (0xff000000 | t << 16 | t << 8 | t);
+}
+
+uint32_t Triangle::getColor(const Pixel &p, const Light &l) const
+{
+  // define static material color
+  const static float shininess = 15.0f;
+  const static Vector3 diffuse(0.929524f, 0.796542f, 0.178823f);
+  const static Vector3 specular(1.00000f, 0.980392f, 0.549020f);
+
+  // calculate position and normal for p
+  const Vector3 &t = p.t;
+  Vector3 v = t.x()*vertices[0] + t.y()*vertices[1] + t.z()*vertices[2];
+  Vector3 n = t.x()*normals[0] + t.y()*normals[1] + t.z()*normals[2];
+  n.normalize();
+
+  // calculate light vector, view vector and half vector
+  Vector3 li = (l.position-v).normalized();
+  Vector3 vi = (-v).normalized();
+  Vector3 h = (li+vi).normalized();
+
+  // calculate color using phong model
+  Vector3 color = l.ambient;
+  color += diffuse.cwiseProduct(l.diffuse) * (n.dot(li));
+  color += specular.cwiseProduct(l.specular) * std::pow(n.dot(h), shininess);
+  color.normalize();
+
+  int r = 255 * color.x();
+  int g = 255 * color.y();
+  int b = 255 * color.z();
+  return (0xff000000 | r << 16 | g << 8 | b);
 }

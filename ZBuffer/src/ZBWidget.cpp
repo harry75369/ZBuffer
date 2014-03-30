@@ -11,6 +11,12 @@ ZBWidget::ZBWidget(Model *model, QWidget *parent)
     m_cameraDistance(3.0f)
 {
   connect(this, SIGNAL(repaintNeeded()), this, SLOT(update()));
+
+  // using default light in OpenGL
+  m_light.ambient = Vector3(0.0, 0.0, 0.0);
+  m_light.diffuse = Vector3(1.0, 1.0, 1.0);
+  m_light.specular = Vector3(1.0, 1.0, 1.0);
+  m_light.position = Vector3(0.0, 0.0, 1.0);
 }
 
 ZBWidget::~ZBWidget()
@@ -100,23 +106,45 @@ void ZBWidget::paintEvent(QPaintEvent *event)
   ASSERT_MSG(m_model, "ZBWidget: failed to load model!");
   QPainter painter(this);
 
-  QImage img(event->rect().size(), QImage::Format_RGB888);
+  const int width = this->width();
+  const int height = this->height();
+
+  QImage img(width, height, QImage::Format_ARGB32);
   img.fill(Qt::darkGray);
 
-  Eigen::MatrixXd zbuffer(width(), height());
+  Eigen::MatrixXd zbuffer(width, height);
   zbuffer.fill(1.0);
 
+  QRgb *img_data[height];
+  for ( int i=0; i < height; i++ )
+  {
+    img_data[i] = (QRgb*)img.scanLine(i);
+  }
+
+#if 0
+  for ( int i=0; i < height; i++ )
+    for ( int j=0; j < width; j++ )
+    {
+      double d = std::sqrt((i-height/2)*(i-height/2)+(j-width/2)*(j-width/2));
+      if ( d < std::min(height/2, width/2) )
+      {
+        img_data[i][j] = 0xffff0000;
+      }
+    }
+#endif
+
+#if 1
   /* This is how our algorithms work:
    * 0. Setup model matrix
    * 1. Setup view matrix (camera)
    * 2. Setup projection matrix
    * 3. Find out all triangles in the viewing frustum
    * 4. Filter out all triangles facing backward to camera
-   * 5. Rasterize each triangle, with depth info attached to each pixel
-   * 6. Find the nearest pixel and calculate it's color
+   * 5. Rasterize each triangle into pixels
+   * 6. Set each pixel of the image to its nearest triangle pixel's color
    */
   Matrix4 transform(Matrix4::Identity());
-  transform *= perspective(60.0f, (float)width()/height(), 1.0f, 1000.0f);
+  transform *= perspective(60.0f, (float)width/height, 1.0f, 1000.0f);
   transform *= lookAt(0.0f, 0.0f, m_cameraDistance, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f);
   transform *= rotateX(m_cameraAngleX);
   transform *= rotateY(m_cameraAngleY);
@@ -124,30 +152,69 @@ void ZBWidget::paintEvent(QPaintEvent *event)
   std::vector<Triangle> triangles;
   m_model->getTriangles(triangles, transform);
 
+  Light light(m_light, transform);
+
+  for ( size_t i=0; i < triangles.size(); i++ )
+  {
+    std::vector<Pixel> pixels;
+    triangles[i].raster(pixels, width, height);
+
+    for ( size_t j=0; j < pixels.size(); j++ )
+    {
+      const Pixel &p = pixels[j];
+      if ( p.x < 0 || p.x >= width
+        || p.y < 0 || p.y >= height )
+        continue;
+
+      float depth = triangles[i].getDepth(p);
+      if ( depth < zbuffer(p.x, p.y) )
+      {
+        zbuffer(p.x, p.y) = depth;
+        //img_data[height-p.y-1][p.x] = triangles[i].getColor(p);
+        img_data[height-p.y-1][p.x] = triangles[i].getColor(p, light);
+      }
+    }
+  }
+#endif
+
   painter.drawImage(QPoint(), img);
 }
 
 void ZBWidget::mouseMoveEvent(QMouseEvent *event)
 {
-  const QPoint &pos = event->pos();
-  //INFO("pos = (%d, %d)", pos.x(), pos.y());
-
-  if ( event->buttons() & Qt::LeftButton )
+  if ( event->buttons() )
   {
-    m_cameraAngleY += (pos.x()-m_lastPos.x());
-    m_cameraAngleX += (pos.y()-m_lastPos.y());
+    m_buttons = event->buttons();
   }
-  else if ( event->buttons() & Qt::RightButton )
-  {
-    m_cameraDistance -= (pos.y()-m_lastPos.y()) * 0.2f;
-  }
-  m_lastPos = event->pos();
-
-  emit repaintNeeded();
 }
 
 void ZBWidget::mousePressEvent(QMouseEvent *event)
 {
   m_lastPos = event->pos();
+  INFO("press pos = (%d, %d)", m_lastPos.x(), m_lastPos.y());
+}
+
+void ZBWidget::mouseReleaseEvent(QMouseEvent *event)
+{
+  const QPoint &pos = event->pos();
+  INFO("release pos = (%d, %d)", pos.x(), pos.y());
+
+  if ( m_buttons & Qt::LeftButton )
+  {
+    m_cameraAngleY += (pos.x()-m_lastPos.x());
+    m_cameraAngleX += (pos.y()-m_lastPos.y());
+  }
+  else if ( m_buttons & Qt::RightButton )
+  {
+    m_cameraDistance -= (pos.y()-m_lastPos.y()) * 0.02f;
+  }
+  m_buttons = 0;
+
+  if ( m_lastPos.x() == pos.x()
+    && m_lastPos.y() == pos.y() )
+    return;
+
+  emit repaintNeeded();
+  INFO("processing...");
 }
 

@@ -7,13 +7,9 @@
 #include <Eigen/Eigen>
 #include "Model.hpp"
 
-class ZBWidget : public QWidget {
+class ZBWidget : public QWidget, EigenTypes {
 
 Q_OBJECT
-
-public:
-  typedef Eigen::Matrix4d Matrix4;
-  typedef Eigen::Vector3d Vector3;
 
 public:
   ZBWidget(Model *model, QWidget *parent=0);
@@ -31,6 +27,7 @@ protected:
   virtual void paintEvent(QPaintEvent *event);
   virtual void mouseMoveEvent(QMouseEvent *event);
   virtual void mousePressEvent(QMouseEvent *event);
+  virtual void mouseReleaseEvent(QMouseEvent *event);
 
 signals:
   void repaintNeeded();
@@ -38,9 +35,11 @@ signals:
 private:
   Model *m_model;
   QPoint m_lastPos;
+  int m_buttons;
   float m_cameraAngleX;
   float m_cameraAngleY;
   float m_cameraDistance;
+  Light m_light;
 
 };
 
