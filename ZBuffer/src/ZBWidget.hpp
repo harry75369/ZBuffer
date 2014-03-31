@@ -39,7 +39,6 @@ private:
   float m_cameraAngleX;
   float m_cameraAngleY;
   float m_cameraDistance;
-  Light m_light;
 
 };
 

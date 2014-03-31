@@ -134,7 +134,10 @@ void Model::calculate_normal(size_t idx)
 
 void Model::getTriangles(std::vector<Triangle> &triangles, const Matrix4 &transform)
 {
-  const Matrix4 normal_transform = transform.inverse().transpose();
+  //const Matrix4 normal_transform = (transform.transpose()*transform).inverse()*transform.transpose();
+  const Matrix4 normal_transform = transform.adjoint().transpose();
+  //const Matrix4 normal_transform = transform.inverse().transpose();
+  //const Matrix4 &normal_transform = transform;
 
   float x[2] = {99999.f, -99999.f};
   float y[2] = {99999.f, -99999.f};
@@ -188,6 +191,7 @@ void Model::getTriangles(std::vector<Triangle> &triangles, const Matrix4 &transf
         continue;
       }
 
+#if 1
       // transform the normals as well
       for ( size_t k=0; k < 3; k++ )
       {
@@ -196,6 +200,14 @@ void Model::getTriangles(std::vector<Triangle> &triangles, const Matrix4 &transf
         t.normals[k] = Vector3(n.x()/n.w(), n.y()/n.w(), n.z()/n.w());
         t.normals[k].normalize();
       }
+#else
+      {
+        Vector3 a = t.vertices[1] - t.vertices[0];
+        Vector3 b = t.vertices[2] - t.vertices[0];
+        t.normals[0] = t.normals[1] = t.normals[2]
+          = a.cross(b).normalized();
+      }
+#endif
 
       // filter out this triangle if it's facing backward to viewer
       // TODO: find out better solution
@@ -210,6 +222,7 @@ void Model::getTriangles(std::vector<Triangle> &triangles, const Matrix4 &transf
       {
         Vector3 n = t.normals[0] + t.normals[1] + t.normals[2];
         n.normalize();
+
         INFO("normal = (%.2f, %.2f, %.2f)", n.x(), n.y(), n.z());
       }
 
@@ -278,12 +291,11 @@ float Triangle::getDepth(const Pixel &p) const
 
 uint32_t Triangle::getColor(const Pixel &p) const
 {
+#if 0
   int t = 255 * (0.5*getDepth(p)+0.5);
   return (0xff000000 | t << 16 | t << 8 | t);
-}
+#endif
 
-uint32_t Triangle::getColor(const Pixel &p, const Light &l) const
-{
   // define static material color
   const static float shininess = 15.0f;
   const static Vector3 diffuse(0.929524f, 0.796542f, 0.178823f);
@@ -295,16 +307,22 @@ uint32_t Triangle::getColor(const Pixel &p, const Light &l) const
   Vector3 n = t.x()*normals[0] + t.y()*normals[1] + t.z()*normals[2];
   n.normalize();
 
+  const Vector3 light_position = Vector3(0.0, 5.0, 0.0);
+
   // calculate light vector, view vector and half vector
-  Vector3 li = (l.position-v).normalized();
+  Vector3 li = (light_position-v).normalized();
   Vector3 vi = (-v).normalized();
   Vector3 h = (li+vi).normalized();
 
   // calculate color using phong model
-  Vector3 color = l.ambient;
-  color += diffuse.cwiseProduct(l.diffuse) * (n.dot(li));
-  color += specular.cwiseProduct(l.specular) * std::pow(n.dot(h), shininess);
-  color.normalize();
+  Vector3 color = 0.3*diffuse;
+  if ( n.dot(li) > 0 )
+    color += diffuse * (n.dot(li));
+  if ( n.dot(h) >= 0 )
+    color += specular * std::pow(n.dot(h), shininess);
+  color(0) = std::max(color(0), 0.0); color(0) = std::min(color(0), 1.0);
+  color(1) = std::max(color(1), 0.0); color(1) = std::min(color(1), 1.0);
+  color(2) = std::max(color(2), 0.0); color(2) = std::min(color(2), 1.0);
 
   int r = 255 * color.x();
   int g = 255 * color.y();

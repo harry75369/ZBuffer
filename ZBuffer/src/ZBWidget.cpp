@@ -11,12 +11,6 @@ ZBWidget::ZBWidget(Model *model, QWidget *parent)
     m_cameraDistance(3.0f)
 {
   connect(this, SIGNAL(repaintNeeded()), this, SLOT(update()));
-
-  // using default light in OpenGL
-  m_light.ambient = Vector3(0.0, 0.0, 0.0);
-  m_light.diffuse = Vector3(1.0, 1.0, 1.0);
-  m_light.specular = Vector3(1.0, 1.0, 1.0);
-  m_light.position = Vector3(0.0, 0.0, 1.0);
 }
 
 ZBWidget::~ZBWidget()
@@ -149,10 +143,17 @@ void ZBWidget::paintEvent(QPaintEvent *event)
   transform *= rotateX(m_cameraAngleX);
   transform *= rotateY(m_cameraAngleY);
 
+  INFO("transform = (%.2f, %.2f, %.2f, %.2f,\n"
+"                    %.2f, %.2f, %.2f, %.2f,\n"
+"                    %.2f, %.2f, %.2f, %.2f,\n"
+"                    %.2f, %.2f, %.2f, %.2f)",
+    transform(0,0), transform(0,1), transform(0,2), transform(0,3),
+    transform(1,0), transform(1,1), transform(1,2), transform(1,3),
+    transform(2,0), transform(2,1), transform(2,2), transform(2,3),
+    transform(3,0), transform(3,1), transform(3,2), transform(3,3));
+
   std::vector<Triangle> triangles;
   m_model->getTriangles(triangles, transform);
-
-  Light light(m_light, transform);
 
   for ( size_t i=0; i < triangles.size(); i++ )
   {
@@ -170,8 +171,7 @@ void ZBWidget::paintEvent(QPaintEvent *event)
       if ( depth < zbuffer(p.x, p.y) )
       {
         zbuffer(p.x, p.y) = depth;
-        //img_data[height-p.y-1][p.x] = triangles[i].getColor(p);
-        img_data[height-p.y-1][p.x] = triangles[i].getColor(p, light);
+        img_data[height-p.y-1][p.x] = triangles[i].getColor(p);
       }
     }
   }

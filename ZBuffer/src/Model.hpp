@@ -6,33 +6,13 @@
 #include <Eigen/Eigen>
 #include <stdint.h>
 #include "tiny_obj_loader.h"
+#include "Logger.hpp"
 
 struct EigenTypes {
   typedef Eigen::Vector3d Vector3;
   typedef Eigen::Vector4d Vector4;
   typedef Eigen::Matrix3d Matrix3;
   typedef Eigen::Matrix4d Matrix4;
-};
-
-struct Light : public EigenTypes {
-  Vector3 ambient;
-  Vector3 diffuse;
-  Vector3 specular;
-  Vector3 position;
-
-  Light() {}
-  Light(const Light &other, const Matrix4 &transform)
-    : ambient(other.ambient),
-      diffuse(other.diffuse),
-      specular(other.specular)
-  {
-    Vector4 p(other.position.x(),
-              other.position.y(),
-              other.position.z(), 1.0);
-    p = transform * p;
-    p /= p.w();
-    position = Vector3(p.x(), p.y(), p.z());
-  }
 };
 
 struct Pixel : public EigenTypes {
@@ -52,7 +32,6 @@ struct Triangle : public EigenTypes
   void raster(std::vector<Pixel> &pixels, int w, int h) const;
   float getDepth(const Pixel &p) const;
   uint32_t getColor(const Pixel &p) const;
-  uint32_t getColor(const Pixel &p, const Light &light) const;
 };
 
 class Model : public EigenTypes {
