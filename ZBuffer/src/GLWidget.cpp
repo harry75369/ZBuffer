@@ -31,6 +31,8 @@ void GLWidget::init()
   if ( m_numShapes > MAX_SHAPES )
     m_numShapes = MAX_SHAPES;
 
+  glEnable(GL_MULTISAMPLE);
+
   // Generate buffers
   glGenBuffers(m_numShapes, m_indexBuffer);
   glGenBuffers(m_numShapes, m_vertexBuffer);
