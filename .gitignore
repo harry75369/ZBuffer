@@ -10,3 +10,4 @@ moc_*.cpp
 build/
 *.swp
 *.pyc
+.DS_Store

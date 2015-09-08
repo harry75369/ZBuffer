@@ -24,6 +24,7 @@ DEPENDPATH += lib/ \
   ../
 
 LIBS += -L../QGLViewer \
+  -L/System/Library/Frameworks/OpenGL.framework/Libraries \
   -lQGLViewer \
   -lGLU
 

@@ -319,7 +319,7 @@ uint32_t Triangle::getColor(const Pixel &p) const
   if ( n.dot(li) > 0 )
     color += diffuse * (n.dot(li));
   if ( n.dot(h) >= 0 )
-    color += specular * std::pow(n.dot(h), shininess);
+    color += specular * std::pow((double)n.dot(h), (double)shininess);
   color(0) = std::max(color(0), 0.0); color(0) = std::min(color(0), 1.0);
   color(1) = std::max(color(1), 0.0); color(1) = std::min(color(1), 1.0);
   color(2) = std::max(color(2), 0.0); color(2) = std::min(color(2), 1.0);
